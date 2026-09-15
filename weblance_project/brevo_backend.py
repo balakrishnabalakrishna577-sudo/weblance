@@ -1,19 +1,27 @@
 ﻿"""
 weblance_project/brevo_backend.py
 ──────────────────────────────────
-Custom Django email backend using Brevo REST API (HTTPS port 443).
-Bypasses all SMTP port restrictions on Render free tier.
+Custom Django email backend:
+  Primary  → Brevo REST API (HTTPS port 443, no SMTP port issues on Render)
+  Fallback → Gmail SMTP (when Brevo returns 401 IP-blocked)
 
-Usage in settings.py:
-    EMAIL_BACKEND = 'weblance_project.brevo_backend.BrevoAPIBackend'
-    BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
+Settings required:
+    BREVO_API_KEY   = 'xkeysib-...'   (set in Render env vars)
+    EMAIL_HOST_USER = 'infoweblance01@gmail.com'
+    EMAIL_HOST_PASSWORD = '<gmail app password>'
 """
 
 import json
 import logging
+import smtplib
+import ssl
 import urllib.request
 import urllib.error
 from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import base64
+
 from django.core.mail.backends.base import BaseEmailBackend
 from django.conf import settings
 
@@ -22,14 +30,9 @@ logger = logging.getLogger(__name__)
 BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
 
 
-def _get_api_key():
-    return getattr(settings, 'BREVO_API_KEY', '')
-
-
 class BrevoAPIBackend(BaseEmailBackend):
     """
-    Django email backend that sends via Brevo REST API.
-    Works on Render free tier — uses HTTPS port 443 only.
+    Sends via Brevo REST API with automatic Gmail SMTP fallback.
     """
 
     def open(self):
@@ -41,32 +44,30 @@ class BrevoAPIBackend(BaseEmailBackend):
     def send_messages(self, email_messages):
         if not email_messages:
             return 0
-
-        api_key = _get_api_key()
-        if not api_key:
-            logger.error('BrevoAPIBackend: BREVO_API_KEY is not set.')
-            if self.fail_silently:
-                return 0
-            raise RuntimeError('BREVO_API_KEY is not configured.')
-
         sent = 0
         for msg in email_messages:
             try:
-                if self._send(msg, api_key):
+                if self._send(msg):
                     sent += 1
             except Exception as exc:
-                logger.error('BrevoAPIBackend: send failed — %s', exc)
+                logger.error('EmailBackend: send failed — %s', exc)
                 if not self.fail_silently:
                     raise
         return sent
 
-    def _send(self, msg, api_key):
-        # ── Recipients ──────────────────────────────────────────────
+    # ──────────────────────────────────────────────────────────────
+    # PRIMARY: Brevo REST API
+    # ──────────────────────────────────────────────────────────────
+    def _send(self, msg):
+        api_key = getattr(settings, 'BREVO_API_KEY', '').strip()
+        if not api_key:
+            logger.warning('BREVO_API_KEY not set — using Gmail fallback')
+            return self._gmail_fallback(msg)
+
         to_list = [{'email': addr} for addr in (msg.to or [])]
         if not to_list:
             return False
 
-        # ── Sender ──────────────────────────────────────────────────
         from_email = msg.from_email or getattr(settings, 'DEFAULT_FROM_EMAIL', '')
         if '<' in from_email and '>' in from_email:
             name_part, addr_part = from_email.split('<', 1)
@@ -77,11 +78,8 @@ class BrevoAPIBackend(BaseEmailBackend):
         else:
             sender = {'name': 'Weblance', 'email': from_email.strip()}
 
-        # ── Body ────────────────────────────────────────────────────
         html_body  = None
         plain_body = msg.body or ''
-
-        # Check for HTML alternative
         if hasattr(msg, 'alternatives'):
             for content, mimetype in msg.alternatives:
                 if mimetype == 'text/html':
@@ -96,16 +94,12 @@ class BrevoAPIBackend(BaseEmailBackend):
         }
         if html_body:
             payload['htmlContent'] = html_body
-
-        # ── CC / BCC ─────────────────────────────────────────────────
         if msg.cc:
-            payload['cc'] = [{'email': a} for a in msg.cc]
+            payload['cc']  = [{'email': a} for a in msg.cc]
         if msg.bcc:
             payload['bcc'] = [{'email': a} for a in msg.bcc]
 
-        # ── Attachments ──────────────────────────────────────────────
         if msg.attachments:
-            import base64
             attachments = []
             for att in msg.attachments:
                 if isinstance(att, MIMEBase):
@@ -124,7 +118,6 @@ class BrevoAPIBackend(BaseEmailBackend):
             if attachments:
                 payload['attachment'] = attachments
 
-        # ── Send ─────────────────────────────────────────────────────
         data = json.dumps(payload).encode('utf-8')
         req  = urllib.request.Request(
             BREVO_API_URL,
@@ -140,11 +133,81 @@ class BrevoAPIBackend(BaseEmailBackend):
         try:
             resp   = urllib.request.urlopen(req, timeout=20)
             result = json.loads(resp.read().decode())
-            logger.info('BrevoAPIBackend: sent to %s — messageId=%s',
+            logger.info('Brevo API: sent to %s — messageId=%s',
                         [a['email'] for a in to_list],
                         result.get('messageId', '?'))
             return True
+
         except urllib.error.HTTPError as e:
             body = e.read().decode()
-            logger.error('BrevoAPIBackend: HTTP %s — %s', e.code, body)
+            logger.error('Brevo API: HTTP %s — %s', e.code, body)
+            # 401 = IP blocked by Brevo → try Gmail
+            if e.code in (401, 403):
+                logger.warning('Brevo blocked (HTTP %s) — trying Gmail fallback', e.code)
+                return self._gmail_fallback(msg)
             raise RuntimeError(f'Brevo API error {e.code}: {body}')
+
+        except Exception as e:
+            logger.error('Brevo API: connection error — %s', e)
+            logger.warning('Brevo failed — trying Gmail fallback')
+            return self._gmail_fallback(msg)
+
+    # ──────────────────────────────────────────────────────────────
+    # FALLBACK: Gmail SMTP (SSL port 465)
+    # ──────────────────────────────────────────────────────────────
+    def _gmail_fallback(self, msg):
+        """Send via Gmail SMTP SSL as fallback when Brevo is unavailable."""
+        user     = getattr(settings, 'EMAIL_HOST_USER', '').strip()
+        password = getattr(settings, 'EMAIL_HOST_PASSWORD', '').strip()
+
+        if not user or not password:
+            logger.error('Gmail fallback: EMAIL_HOST_USER / EMAIL_HOST_PASSWORD not set')
+            raise RuntimeError('Gmail fallback: credentials not configured')
+
+        to_addrs = list(msg.to or [])
+        if not to_addrs:
+            return False
+
+        # Build MIME message
+        mime = MIMEMultipart('alternative')
+        mime['Subject'] = msg.subject or '(no subject)'
+        mime['From']    = msg.from_email or getattr(settings, 'DEFAULT_FROM_EMAIL', user)
+        mime['To']      = ', '.join(to_addrs)
+        if msg.cc:
+            mime['Cc'] = ', '.join(msg.cc)
+
+        # Plain text part
+        if msg.body:
+            mime.attach(MIMEText(msg.body, 'plain', 'utf-8'))
+
+        # HTML part
+        if hasattr(msg, 'alternatives'):
+            for content, mimetype in msg.alternatives:
+                if mimetype == 'text/html':
+                    mime.attach(MIMEText(content, 'html', 'utf-8'))
+                    break
+
+        # Attachments
+        if msg.attachments:
+            from email.mime.application import MIMEApplication
+            for att in msg.attachments:
+                if isinstance(att, tuple) and len(att) >= 2:
+                    name, content = att[0], att[1]
+                    if isinstance(content, str):
+                        content = content.encode()
+                    part = MIMEApplication(content, Name=name)
+                    part['Content-Disposition'] = f'attachment; filename="{name}"'
+                    mime.attach(part)
+
+        all_recipients = to_addrs + list(msg.cc or []) + list(msg.bcc or [])
+
+        try:
+            ctx = ssl.create_default_context()
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=ctx, timeout=20) as server:
+                server.login(user, password)
+                server.sendmail(user, all_recipients, mime.as_string())
+            logger.info('Gmail fallback: sent to %s', all_recipients)
+            return True
+        except Exception as exc:
+            logger.error('Gmail fallback: failed — %s', exc)
+            raise RuntimeError(f'Gmail fallback failed: {exc}')
