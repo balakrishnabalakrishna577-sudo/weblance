@@ -38,7 +38,7 @@ services:
       - key: BREVO_API_KEY
         sync: false
       - key: EMAIL_BACKEND
-        value: "django.core.mail.backends.smtp.EmailBackend"
+        value: "weblance_project.brevo_backend.BrevoAPIBackend"
       - key: EMAIL_HOST
         value: "smtp.gmail.com"
       - key: EMAIL_PORT
