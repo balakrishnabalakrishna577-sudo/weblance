@@ -60,9 +60,20 @@ class BrevoAPIBackend(BaseEmailBackend):
     # ──────────────────────────────────────────────────────────────
     def _send(self, msg):
         api_key = getattr(settings, 'BREVO_API_KEY', '').strip()
+
+        # Skip Brevo if no API key — go straight to Gmail
         if not api_key:
-            logger.warning('BREVO_API_KEY not set — using Gmail fallback')
+            logger.info('BREVO_API_KEY not set — using Gmail directly')
             return self._gmail_fallback(msg)
+
+        # Try Brevo first, fall back to Gmail on any failure
+        try:
+            return self._brevo_send(msg, api_key)
+        except Exception as e:
+            logger.warning('Brevo failed (%s) — trying Gmail fallback', e)
+            return self._gmail_fallback(msg)
+
+    def _brevo_send(self, msg, api_key):
 
         to_list = [{'email': addr} for addr in (msg.to or [])]
         if not to_list:
@@ -131,7 +142,7 @@ class BrevoAPIBackend(BaseEmailBackend):
         )
 
         try:
-            resp   = urllib.request.urlopen(req, timeout=20)
+            resp   = urllib.request.urlopen(req, timeout=5)  # Fast timeout — fail fast to Gmail
             result = json.loads(resp.read().decode())
             logger.info('Brevo API: sent to %s — messageId=%s',
                         [a['email'] for a in to_list],
@@ -203,7 +214,7 @@ class BrevoAPIBackend(BaseEmailBackend):
 
         try:
             ctx = ssl.create_default_context()
-            with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=ctx, timeout=20) as server:
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=ctx, timeout=15) as server:
                 server.login(user, password)
                 server.sendmail(user, all_recipients, mime.as_string())
             logger.info('Gmail fallback: sent to %s', all_recipients)
