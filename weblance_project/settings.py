@@ -199,18 +199,17 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 1 week (in seconds)
 SESSION_SAVE_EVERY_REQUEST = True
 
 # ── Email ───────────────────────────────────────────────────
-# Brevo REST API (port 443, never blocked on Render) as primary
-# Gmail SMTP SSL (port 465) as automatic fallback inside BrevoAPIBackend
-BREVO_API_KEY       = os.environ.get('BREVO_API_KEY', '').strip()
-EMAIL_BACKEND       = 'weblance_project.brevo_backend.BrevoAPIBackend'
+# Gmail SMTP SSL — direct, reliable, no Brevo dependency
+EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST          = 'smtp.gmail.com'
 EMAIL_PORT          = 465
 EMAIL_USE_TLS       = False
 EMAIL_USE_SSL       = True
 EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', 'infoweblance01@gmail.com')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'ecyrchhyzhhrzgyq')
 DEFAULT_FROM_EMAIL  = 'Weblance <infoweblance01@gmail.com>'
 SERVER_EMAIL        = 'infoweblance01@gmail.com'
+BREVO_API_KEY       = os.environ.get('BREVO_API_KEY', '')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
 # ── Gemini AI ─────────────────────────────────────────────────────

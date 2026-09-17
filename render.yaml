@@ -40,7 +40,7 @@ services:
       - key: EMAIL_HOST_USER
         value: "infoweblance01@gmail.com"
       - key: EMAIL_HOST_PASSWORD
-        sync: false
+        value: "ecyrchhyzhhrzgyq"
       - key: CSRF_TRUSTED_ORIGINS
         value: "https://weblancehub.in,https://www.weblancehub.in"
       - key: CLOUDINARY_CLOUD_NAME
