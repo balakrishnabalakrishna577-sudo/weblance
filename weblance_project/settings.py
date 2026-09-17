@@ -199,19 +199,20 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 1 week (in seconds)
 SESSION_SAVE_EVERY_REQUEST = True
 
 # ── Email ─────────────────────────────────────────────────────────
+# Simple Gmail SSL setup — works on Render (port 465 not blocked)
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
 if BREVO_API_KEY:
     EMAIL_BACKEND = 'weblance_project.brevo_backend.BrevoAPIBackend'
 else:
-    EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
-# Always load SMTP credentials (used by Gmail fallback in brevo_backend + direct SMTP)
+# Gmail SMTP credentials — always loaded for fallback and direct sending
 EMAIL_HOST          = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT          = int(os.environ.get('EMAIL_PORT', 465))
 EMAIL_USE_TLS       = os.environ.get('EMAIL_USE_TLS', 'False') == 'True'
 EMAIL_USE_SSL       = os.environ.get('EMAIL_USE_SSL', 'True') == 'True'
-EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', 'infoweblance01@gmail.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'ecyrchhyzhhrzgyq')
 DEFAULT_FROM_EMAIL  = os.environ.get('DEFAULT_FROM_EMAIL', 'Weblance <infoweblance01@gmail.com>')
 SERVER_EMAIL        = 'infoweblance01@gmail.com'
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
