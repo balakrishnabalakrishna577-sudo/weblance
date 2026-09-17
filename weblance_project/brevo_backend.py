@@ -142,7 +142,7 @@ class BrevoAPIBackend(BaseEmailBackend):
         )
 
         try:
-            resp   = urllib.request.urlopen(req, timeout=5)  # Fast timeout — fail fast to Gmail
+            resp   = urllib.request.urlopen(req, timeout=10)  # longer timeout for Render
             result = json.loads(resp.read().decode())
             logger.info('Brevo API: sent to %s — messageId=%s',
                         [a['email'] for a in to_list],
@@ -152,11 +152,9 @@ class BrevoAPIBackend(BaseEmailBackend):
         except urllib.error.HTTPError as e:
             body = e.read().decode()
             logger.error('Brevo API: HTTP %s — %s', e.code, body)
-            # 401 = IP blocked by Brevo → try Gmail
-            if e.code in (401, 403):
-                logger.warning('Brevo blocked (HTTP %s) — trying Gmail fallback', e.code)
-                return self._gmail_fallback(msg)
-            raise RuntimeError(f'Brevo API error {e.code}: {body}')
+            # Always fall back to Gmail on any Brevo error
+            logger.warning('Brevo blocked (HTTP %s) — trying Gmail fallback', e.code)
+            return self._gmail_fallback(msg)
 
         except Exception as e:
             logger.error('Brevo API: connection error — %s', e)

@@ -37,20 +37,10 @@ services:
         value: "admin123"
       - key: BREVO_API_KEY
         sync: false
-      - key: EMAIL_BACKEND
-        value: "django.core.mail.backends.smtp.EmailBackend"
-      - key: EMAIL_HOST
-        value: "smtp.gmail.com"
-      - key: EMAIL_PORT
-        value: "465"
-      - key: EMAIL_USE_TLS
-        value: "False"
-      - key: EMAIL_USE_SSL
-        value: "True"
       - key: EMAIL_HOST_USER
         value: "infoweblance01@gmail.com"
       - key: EMAIL_HOST_PASSWORD
-        value: "ecyrchhyzhhrzgyq"
+        sync: false
       - key: CSRF_TRUSTED_ORIGINS
         value: "https://weblancehub.in,https://www.weblancehub.in"
       - key: CLOUDINARY_CLOUD_NAME
