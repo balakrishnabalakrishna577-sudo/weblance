@@ -198,15 +198,14 @@ SESSION_COOKIE_HTTPONLY = True   # JS cannot access the session cookie
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 1 week (in seconds)
 SESSION_SAVE_EVERY_REQUEST = True
 
-# ── Email ───────────────────────────────────────────────────
-# Gmail SMTP SSL — direct, reliable, no Brevo dependency
+# ── Email — Brevo SMTP port 2525 (works on Render free tier) ──────
 EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST          = 'smtp.gmail.com'
-EMAIL_PORT          = 465
-EMAIL_USE_TLS       = False
-EMAIL_USE_SSL       = True
-EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', 'infoweblance01@gmail.com')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'ecyrchhyzhhrzgyq')
+EMAIL_HOST          = os.environ.get('EMAIL_HOST', 'smtp-relay.brevo.com')
+EMAIL_PORT          = int(os.environ.get('EMAIL_PORT', 2525))
+EMAIL_USE_TLS       = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_USE_SSL       = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
+EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL  = 'Weblance <infoweblance01@gmail.com>'
 SERVER_EMAIL        = 'infoweblance01@gmail.com'
 BREVO_API_KEY       = os.environ.get('BREVO_API_KEY', '')
