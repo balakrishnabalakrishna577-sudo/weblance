@@ -199,12 +199,15 @@ SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 1 week (in seconds)
 SESSION_SAVE_EVERY_REQUEST = True
 
 # ── Email ─────────────────────────────────────────────────────────
-# Simple Gmail SSL setup — works on Render (port 465 not blocked)
-BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
+# Brevo wins when key is set — ignore any EMAIL_BACKEND env var
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '').strip()
 if BREVO_API_KEY:
     EMAIL_BACKEND = 'weblance_project.brevo_backend.BrevoAPIBackend'
 else:
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_BACKEND = os.environ.get(
+        'EMAIL_BACKEND',
+        'django.core.mail.backends.smtp.EmailBackend'
+    )
 
 # Gmail SMTP credentials — always loaded for fallback and direct sending
 EMAIL_HOST          = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
