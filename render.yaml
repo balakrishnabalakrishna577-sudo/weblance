@@ -37,17 +37,9 @@ services:
         value: "admin123"
       - key: BREVO_API_KEY
         sync: false
-      - key: EMAIL_HOST
-        value: "smtp-relay.brevo.com"
-      - key: EMAIL_PORT
-        value: "2525"
-      - key: EMAIL_USE_TLS
-        value: "True"
-      - key: EMAIL_USE_SSL
-        value: "False"
-      - key: EMAIL_HOST_USER
+      - key: SMTP_USER
         value: "adfd4b001@smtp-brevo.com"
-      - key: EMAIL_HOST_PASSWORD
+      - key: SMTP_PASSWORD
         sync: false
       - key: CSRF_TRUSTED_ORIGINS
         value: "https://weblancehub.in,https://www.weblancehub.in"
