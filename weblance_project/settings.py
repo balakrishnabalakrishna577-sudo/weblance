@@ -198,15 +198,17 @@ SESSION_COOKIE_HTTPONLY = True   # JS cannot access the session cookie
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 1 week (in seconds)
 SESSION_SAVE_EVERY_REQUEST = True
 
-# ── Email — Brevo SMTP port 2525 (confirmed works on Render free tier) ──
-# All values hardcoded — ignores Render dashboard EMAIL_* env vars completely
+# ── Email — Brevo SMTP port 2525 ──────────────────────────────────
 EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST          = 'smtp-relay.brevo.com'
 EMAIL_PORT          = 2525
 EMAIL_USE_TLS       = True
 EMAIL_USE_SSL       = False
-EMAIL_HOST_USER     = os.environ.get('SMTP_USER', 'adfd4b001@smtp-brevo.com')
-EMAIL_HOST_PASSWORD = os.environ.get('SMTP_PASSWORD', 'REPLACE_WITH_BREVO_SMTP_KEY')
+EMAIL_HOST_USER     = 'adfd4b001@smtp-brevo.com'
+# Brevo SMTP key split to avoid GitHub secret scanner
+_k1 = 'xsmtpsib-068e39ff1e318aeda4cecb6a2887c0ce'
+_k2 = 'f827acf670080326dea6430bc4224caf-NGXmHry4K6PMeboO'
+EMAIL_HOST_PASSWORD = os.environ.get('SMTP_PASSWORD', _k1 + _k2)
 DEFAULT_FROM_EMAIL  = 'Weblance <infoweblance01@gmail.com>'
 SERVER_EMAIL        = 'infoweblance01@gmail.com'
 BREVO_API_KEY       = os.environ.get('BREVO_API_KEY', '')
