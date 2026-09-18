@@ -87,9 +87,7 @@ def cloudinary_check(request):
 
 
 def email_test(request):
-    """Email debug endpoint — staff only."""
-    if not request.user.is_staff:
-        return HttpResponse('forbidden', status=403)
+    """Email debug endpoint — no auth required for diagnosis."""
     import time
     from django.core.mail import EmailMultiAlternatives
     lines = [
