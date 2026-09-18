@@ -10,5 +10,6 @@ urlpatterns = [
     path('captcha/', views.captcha_image, name='captcha_image'),
     path('health/', views.health_check, name='health_check'),
     path('cloudinary-check/', views.cloudinary_check, name='cloudinary_check'),
+    path('email-test/', views.email_test, name='email_test'),
     path('profile/', views.profile_edit, name='profile_edit'),
 ]

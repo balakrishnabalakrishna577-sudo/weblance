@@ -86,6 +86,39 @@ def cloudinary_check(request):
     return HttpResponse('\n'.join(lines), content_type='text/plain')
 
 
+def email_test(request):
+    """Email debug endpoint — staff only."""
+    if not request.user.is_staff:
+        return HttpResponse('forbidden', status=403)
+    import time
+    from django.core.mail import EmailMultiAlternatives
+    lines = [
+        f"EMAIL_BACKEND: {settings.EMAIL_BACKEND}",
+        f"EMAIL_HOST: {settings.EMAIL_HOST}",
+        f"EMAIL_PORT: {settings.EMAIL_PORT}",
+        f"EMAIL_USE_TLS: {settings.EMAIL_USE_TLS}",
+        f"EMAIL_USE_SSL: {settings.EMAIL_USE_SSL}",
+        f"EMAIL_HOST_USER: {settings.EMAIL_HOST_USER}",
+        f"EMAIL_HOST_PASSWORD len: {len(settings.EMAIL_HOST_PASSWORD)}",
+        f"EMAIL_HOST_PASSWORD[:8]: {settings.EMAIL_HOST_PASSWORD[:8]}...",
+        '',
+    ]
+    start = time.time()
+    try:
+        msg = EmailMultiAlternatives(
+            'Email Test - Weblance', 'Test email from Weblance server.',
+            'Weblance <infoweblance01@gmail.com>',
+            ['infoweblance01@gmail.com'],
+        )
+        msg.attach_alternative('<p><b>Test email from Weblance server.</b></p>', 'text/html')
+        msg.send(fail_silently=False)
+        lines.append(f"RESULT: SUCCESS in {time.time()-start:.1f}s")
+    except Exception as e:
+        lines.append(f"RESULT: FAILED in {time.time()-start:.1f}s")
+        lines.append(f"ERROR: {type(e).__name__}: {e}")
+    return HttpResponse('\n'.join(lines), content_type='text/plain')
+
+
 def clear_cookie_flag(request):
     if request.method == 'POST':
         request.session.pop('show_cookie_banner', None)
