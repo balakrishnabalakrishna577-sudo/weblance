@@ -95,13 +95,28 @@
                            style="letter-spacing:4px;font-weight:700;font-size:1.1rem;text-align:center;">
                     <i class="fas fa-shield-alt input-icon"></i>
                 </div>
-                <div id="otpStatus" style="font-size:0.82rem;margin-bottom:12px;"></div>
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-                    <span id="otpCountdown" style="font-size:0.82rem;color:#94a3b8;"></span>
+                <div id="otpStatus" style="font-size:0.82rem;margin-bottom:8px;"></div>
+
+                <!-- Countdown + Resend row -->
+                <div style="display:flex;align-items:center;justify-content:space-between;
+                            margin-bottom:16px;padding:10px 14px;
+                            background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.12);
+                            border-radius:10px;">
+                    <span id="otpCountdown" style="font-size:0.80rem;color:#64748b;display:flex;align-items:center;gap:6px;">
+                        <i class="fas fa-clock" style="color:#6366F1;font-size:0.75rem;"></i>
+                        <span id="otpCountdownText">Sending…</span>
+                    </span>
                     <button type="button" id="resendOtpBtn"
-                            style="background:none;border:none;color:#6366F1;font-size:0.82rem;
-                                   cursor:pointer;padding:0;text-decoration:underline;display:none;">
-                        Resend OTP
+                            style="display:none;
+                                   background:rgba(99,102,241,0.08);
+                                   border:1px solid rgba(99,102,241,0.25);
+                                   color:#6366F1;font-size:0.78rem;font-weight:600;
+                                   cursor:pointer;padding:5px 14px;border-radius:50px;
+                                   font-family:'Poppins',sans-serif;
+                                   transition:all 0.2s ease;"
+                            onmouseover="this.style.background='rgba(99,102,241,0.15)'"
+                            onmouseout="this.style.background='rgba(99,102,241,0.08)'">
+                        <i class="fas fa-redo-alt" style="font-size:0.70rem;margin-right:4px;"></i>Resend OTP
                     </button>
                 </div>
             </div>
@@ -187,9 +202,10 @@ const otpInput    = document.getElementById('otpInput');
 const otpStatus   = document.getElementById('otpStatus');
 const otpAlert    = document.getElementById('otpAlert');
 const resendBtn   = document.getElementById('resendOtpBtn');
-const otpCountdown = document.getElementById('otpCountdown');
+const otpCountdownText = document.getElementById('otpCountdownText');
 
 let countdownTimer = null;
+let resendCooldownTimer = null;
 
 function getCsrfToken() {
     const el = document.querySelector('[name=csrfmiddlewaretoken]');
@@ -213,12 +229,14 @@ function startCountdown(seconds) {
     function tick() {
         const m = String(Math.floor(remaining / 60)).padStart(2, '0');
         const s = String(remaining % 60).padStart(2, '0');
-        otpCountdown.textContent = `Code expires in ${m}:${s}`;
+        otpCountdownText.textContent = `Code expires in ${m}:${s}`;
+        otpCountdownText.parentElement.style.color = remaining <= 60 ? '#ef4444' : '#64748b';
         if (remaining <= 0) {
             clearInterval(countdownTimer);
-            otpCountdown.textContent = 'OTP has expired.';
-            otpCountdown.style.color = '#ef4444';
-            resendBtn.style.display = 'inline';
+            otpCountdownText.textContent = 'OTP expired — request a new one';
+            otpCountdownText.parentElement.style.color = '#ef4444';
+            resendBtn.style.display = 'inline-flex';
+            resendBtn.disabled = false;
         }
         remaining--;
     }
@@ -226,7 +244,24 @@ function startCountdown(seconds) {
     countdownTimer = setInterval(tick, 1000);
 }
 
-async function requestOtp() {
+function startResendCooldown(seconds) {
+    /* After resend, disable button for `seconds` to prevent spam */
+    resendBtn.disabled = true;
+    let remaining = seconds;
+    function tick() {
+        resendBtn.innerHTML = `<i class="fas fa-clock" style="font-size:0.70rem;margin-right:4px;"></i>Resend in ${remaining}s`;
+        if (remaining <= 0) {
+            clearInterval(resendCooldownTimer);
+            resendBtn.disabled = false;
+            resendBtn.innerHTML = '<i class="fas fa-redo-alt" style="font-size:0.70rem;margin-right:4px;"></i>Resend OTP';
+        }
+        remaining--;
+    }
+    tick();
+    resendCooldownTimer = setInterval(tick, 1000);
+}
+
+async function requestOtp(isResend) {
     hideAlert();
     const email = emailInput ? emailInput.value.trim() : '';
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
@@ -234,8 +269,13 @@ async function requestOtp() {
         return false;
     }
 
-    sendOtpBtn.disabled = true;
-    sendOtpBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Sending…';
+    if (!isResend) {
+        sendOtpBtn.disabled = true;
+        sendOtpBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Sending…';
+    } else {
+        resendBtn.disabled = true;
+        resendBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:0.70rem;margin-right:4px;"></i>Sending…';
+    }
 
     try {
         const resp = await fetch('{% url "send_otp" %}', {
@@ -249,58 +289,72 @@ async function requestOtp() {
         const data = await resp.json();
 
         if (data.ok) {
-            // Show OTP section
-            otpSection.style.display = 'block';
-            sendOtpBtn.style.display = 'none';
-            submitBtn.style.display  = 'block';
+            // Show OTP section on first send
+            if (!isResend) {
+                otpSection.style.display = 'block';
+                sendOtpBtn.style.display = 'none';
+                submitBtn.style.display  = 'block';
+            }
 
-            otpStatus.textContent = `✓ OTP sent to ${email}`;
+            otpStatus.innerHTML = `<i class="fas fa-check-circle" style="color:#22c55e;margin-right:4px;"></i>OTP sent to <strong>${email}</strong>`;
             otpStatus.style.color = '#22c55e';
 
-            startCountdown(600);
+            // Reset OTP input
+            otpInput.value = '';
             otpInput.focus();
+
+            // Start fresh 10-min countdown
+            startCountdown(600);
+
+            // On resend: 30-second cooldown before resend is allowed again
+            if (isResend) {
+                resendBtn.style.display = 'inline-flex';
+                startResendCooldown(30);
+            }
+
+            if (!isResend) {
+                sendOtpBtn.disabled = false;
+                sendOtpBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i> Send OTP &amp; Verify';
+            }
             return true;
         } else {
             showAlert(data.error || 'Could not send OTP. Please try again.');
-            sendOtpBtn.disabled = false;
-            sendOtpBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i> Send OTP &amp; Verify';
+            if (!isResend) {
+                sendOtpBtn.disabled = false;
+                sendOtpBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i> Send OTP &amp; Verify';
+            } else {
+                resendBtn.disabled = false;
+                resendBtn.innerHTML = '<i class="fas fa-redo-alt" style="font-size:0.70rem;margin-right:4px;"></i>Resend OTP';
+            }
             return false;
         }
     } catch (err) {
         showAlert('Network error. Please check your connection and try again.');
-        sendOtpBtn.disabled = false;
-        sendOtpBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i> Send OTP &amp; Verify';
+        if (!isResend) {
+            sendOtpBtn.disabled = false;
+            sendOtpBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i> Send OTP &amp; Verify';
+        } else {
+            resendBtn.disabled = false;
+            resendBtn.innerHTML = '<i class="fas fa-redo-alt" style="font-size:0.70rem;margin-right:4px;"></i>Resend OTP';
+        }
         return false;
     }
 }
 
-sendOtpBtn.addEventListener('click', requestOtp);
+sendOtpBtn.addEventListener('click', () => requestOtp(false));
 
 resendBtn.addEventListener('click', async function () {
-    otpStatus.textContent = '';
-    otpInput.value = '';
-    await requestOtp();
-    // Re-show resend button area is handled inside requestOtp → startCountdown
+    await requestOtp(true);
 });
 
 // Auto-submit when 6 digits are entered
 if (otpInput) {
     otpInput.addEventListener('input', function () {
-        // Allow digits only
         this.value = this.value.replace(/\D/g, '');
         if (this.value.length === 6) {
             submitBtn.click();
         }
     });
 }
-
-// If the page reloaded with errors and OTP was already sent, re-show OTP section
-{% if form_data %}
-(function () {
-    const otpMsg = document.querySelector('#otpSection');
-    // Only auto-show if there's a retained form — user had already sent OTP
-    // We rely on the hidden otpSection; server messages will guide the user.
-})();
-{% endif %}
 </script>
 {% endblock %}
