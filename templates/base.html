@@ -1687,6 +1687,41 @@ document.addEventListener('DOMContentLoaded', function() {
 
 {% block extra_js %}{% endblock %}
 
+<!-- ── Disable right-click / DevTools on user-facing pages ── -->
+<script>
+(function () {
+    'use strict';
+
+    /* Block right-click context menu */
+    document.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        return false;
+    });
+
+    /* Block common DevTools keyboard shortcuts */
+    document.addEventListener('keydown', function (e) {
+        var key = e.key || e.keyCode;
+        /* F12 */
+        if (key === 'F12' || e.keyCode === 123) { e.preventDefault(); return false; }
+        /* Ctrl+Shift+I / Cmd+Option+I */
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (key === 'I' || key === 'i' || e.keyCode === 73)) { e.preventDefault(); return false; }
+        /* Ctrl+Shift+J / Cmd+Option+J */
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (key === 'J' || key === 'j' || e.keyCode === 74)) { e.preventDefault(); return false; }
+        /* Ctrl+Shift+C / Cmd+Option+C */
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (key === 'C' || key === 'c' || e.keyCode === 67)) { e.preventDefault(); return false; }
+        /* Ctrl+U — view source */
+        if ((e.ctrlKey || e.metaKey) && (key === 'U' || key === 'u' || e.keyCode === 85)) { e.preventDefault(); return false; }
+    });
+
+    /* Block text selection via keyboard (optional UX hardening) */
+    document.addEventListener('selectstart', function (e) {
+        /* Allow selection inside input/textarea so forms still work */
+        var tag = e.target && e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        e.preventDefault();
+    });
+})();
+</script>
 
 </body>
 </html>
